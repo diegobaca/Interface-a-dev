@@ -125,10 +125,13 @@ void serveHTML(WiFiClient &client) {
   client.println("<html>");
   client.println("<head>");
   client.println("<title>LEGO Interface A Outputs</title>");
+  client.println("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">");
   client.println("<style>");
-  client.println("body { font-family: Arial; text-align: center; margin-top: 50px; }");
-  client.println("button { padding: 10px 20px; font-size: 16px; cursor: pointer; margin: 5px; border: 5px solid black; }");
+  client.println("body { font-family: Arial, sans-serif; text-align: center; margin: 0; padding: 0; }");
+  client.println("h1, h2, h3 { margin: 10px 0; }");
+  client.println("button { padding: 15px 20px; font-size: 16px; margin: 10px; border: 5px solid black; border-radius: 5px; cursor: pointer; width: 80%; max-width: 300px; }");
   client.println(".active { border-color: green; }");
+  client.println("@media (max-width: 600px) { button { font-size: 14px; padding: 10px 15px; } h1, h2, h3 { font-size: 18px; } }");
   client.println("</style>");
   client.println("</head>");
   client.println("<body>");
@@ -148,54 +151,79 @@ void serveHTML(WiFiClient &client) {
   client.println("<button id=\"bridgeC_L\" onclick=\"bridge('C', 'L')\">L</button>");
   client.println("<button id=\"bridgeC_R\" onclick=\"bridge('C', 'R')\">R</button><br>");
   client.println("<script>");
-  client.println("function fetchStatesAndUpdate() {");
-  client.println("  fetch('/state')");
-  client.println("    .then((response) => response.json())");
-  client.println("    .then((data) => updateButtonStyles(data))");
-  client.println("    .catch((error) => console.error('Error fetching states:', error));");
-  client.println("}");
-  client.println("function toggleOutput(output) {");
-  client.println("  fetch(`/toggle${output}`).then(() => fetchStatesAndUpdate());");
-  client.println("}");
-  client.println("function bridge(type, direction) {");
-  client.println("  fetch(`/bridge${type}/${direction}`).then(() => fetchStatesAndUpdate());");
-  client.println("}");
-  client.println("function updateButtonStyles(data) {");
-  client.println("  for (let i = 0; i < 6; i++) {");
-  client.println("    const button = document.getElementById(`output${i}`);");
-  client.println("    if (data.outputs[i]) { button.classList.add('active'); } else { button.classList.remove('active'); }");
+  client.println("  function fetchStatesAndUpdate() {");
+  client.println("    fetch('/state') // Fetch state from the server");
+  client.println("      .then((response) => response.json())");
+  client.println("      .then((data) => updateButtonStyles(data))");
+  client.println("      .catch((error) => console.error('Error fetching states:', error));");
   client.println("  }");
-  client.println("  ['A', 'B', 'C'].forEach((bridge, index) => {");
-  client.println("    const leftButton = document.getElementById(`bridge${bridge}_L`);");
-  client.println("    const rightButton = document.getElementById(`bridge${bridge}_R`);");
-  client.println("    if (data.bridges[index] === 'L') {");
-  client.println("      leftButton.classList.add('active'); rightButton.classList.remove('active');");
-  client.println("    } else if (data.bridges[index] === 'R') {");
-  client.println("      rightButton.classList.add('active'); leftButton.classList.remove('active');");
-  client.println("    } else {");
-  client.println("      leftButton.classList.remove('active'); rightButton.classList.remove('active');");
+  client.println("  function toggleOutput(output) {");
+  client.println("    const button = document.getElementById(`output${output}`);");
+  client.println("    button.classList.toggle('active'); // Immediate feedback on button press");
+  client.println("    fetch(`/toggle${output}`) // Send toggle request to the server");
+  client.println("      .catch((error) => console.error('Error toggling output:', error));");
+  client.println("  }");
+  client.println("  function bridge(type, direction) {");
+  client.println("    const leftButton = document.getElementById(`bridge${type}_L`);");
+  client.println("    const rightButton = document.getElementById(`bridge${type}_R`);");
+  client.println("    if (direction === 'L') {");
+  client.println("      leftButton.classList.add('active');");
+  client.println("      rightButton.classList.remove('active');");
+  client.println("    } else if (direction === 'R') {");
+  client.println("      rightButton.classList.add('active');");
+  client.println("      leftButton.classList.remove('active');");
   client.println("    }");
-  client.println("  });");
-  client.println("}");
-  client.println("fetchStatesAndUpdate();"); // Fetch the current state immediately when the page loads
-  client.println("setInterval(fetchStatesAndUpdate, 2000);"); // Periodically fetch the state every 2 seconds
+  client.println("    fetch(`/bridge${type}/${direction}`) // Send bridge command to the server");
+  client.println("      .catch((error) => console.error('Error setting bridge direction:', error));");
+  client.println("  }");
+  client.println("  function updateButtonStyles(data) {");
+  client.println("    // Update outputs");
+  client.println("    for (let i = 0; i < 6; i++) {");
+  client.println("      const button = document.getElementById(`output${i}`);");
+  client.println("      if (data.o[i] === 1) { // 1 means ON");
+  client.println("        button.classList.add('active');");
+  client.println("      } else {");
+  client.println("        button.classList.remove('active');");
+  client.println("      }");
+  client.println("    }");
+  client.println("    // Update bridges");
+  client.println("    ['A', 'B', 'C'].forEach((bridge, index) => {");
+  client.println("      const leftButton = document.getElementById(`bridge${bridge}_L`);");
+  client.println("      const rightButton = document.getElementById(`bridge${bridge}_R`);");
+  client.println("      if (data.b[index] === 'L') {");
+  client.println("        leftButton.classList.add('active'); rightButton.classList.remove('active');");
+  client.println("      } else if (data.b[index] === 'R') {");
+  client.println("        rightButton.classList.add('active'); leftButton.classList.remove('active');");
+  client.println("      } else {");
+  client.println("        leftButton.classList.remove('active'); rightButton.classList.remove('active');");
+  client.println("      }");
+  client.println("    });");
+  client.println("  }");
+  client.println("  // Fetch the initial state and update the UI");
+  client.println("  fetchStatesAndUpdate();");
+  client.println("  // Periodically fetch state updates every 0.5 seconds");
+  client.println("  setInterval(fetchStatesAndUpdate, 500);");
   client.println("</script>");
   client.println("</body>");
   client.println("</html>");
 }
 
 String getOutputStatesJSON() {
-  String json = "{ \"outputs\": [";
+  String json = "{ \"o\": [";
   for (int i = 0; i < 6; i++) {
-    json += outputStates[i] ? "true" : "false";
-    if (i < 5) json += ", ";
+    json += outputStates[i] ? "1" : "0"; // Convert boolean to integer
+    if (i < 5) json += ","; // Add comma between items
   }
-  json += "], \"bridges\": [";
+  json += "], \"b\": [";
   for (int i = 0; i < 3; i++) {
-    if (lastDirection[i] == 'L') json += "\"L\"";
-    else if (lastDirection[i] == 'R') json += "\"R\"";
-    else json += "null"; // Default state (off)
-    if (i < 2) json += ", ";
+    if (lastDirection[i] == 'L') {
+      json += "\"L\"";
+    } else if (lastDirection[i] == 'R') {
+      json += "\"R\"";
+    } else {
+      json += "\"N\""; // Represent null/default state as "N"
+    }
+    if (i < 2) json += ","; // Add comma between items
   }
   json += "] }";
   return json;
